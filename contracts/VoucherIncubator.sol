@@ -9,7 +9,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Base64.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-contract voucherIncubatorContract is ERC721Enumerable, Ownable {
+contract VoucherIncubator is ERC721Enumerable, Ownable {
     struct IncubatorVoucher {
         uint256 tokenID;
         uint256 redeemableEggs;

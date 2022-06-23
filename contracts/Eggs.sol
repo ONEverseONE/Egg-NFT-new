@@ -102,6 +102,7 @@ contract Eggs is ERC721Enumerable,Ownable{
         wlVoucher = Iwhitelistvouchers(_wlvoucher);
         incubator = VoucherIncubators(_incubators);
         wlPhase = true;
+        Phase1 = true;
         paymentReceiver = _paymentReceiver;
     }
 
@@ -459,6 +460,10 @@ contract Eggs is ERC721Enumerable,Ownable{
 
     function toggleIncubatorSale() external onlyOwner{
         incubatorSale = !incubatorSale;
+    }
+
+    function togglePhase1() external onlyOwner{
+        Phase1 = !Phase1;
     }
 
 }
