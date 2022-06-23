@@ -137,6 +137,15 @@ contract Eggs is ERC721Enumerable,Ownable{
         }
     }
 
+    function publicMint(uint256 _mintAmount, bool USDC_Payment) external notPaused{
+        require(!wlPhase,"Phase 3 not started yet");
+        require(MAX_SUPPLY >= tokenID + _mintAmount,"Max supply reached");
+        require(msg.sender == tx.origin,"Contract not allowed");
+        if(USDC_Payment){
+
+        }
+    }
+
     function generateEgg(uint random,uint salt)
         private
         returns (Egg memory)
@@ -350,11 +359,18 @@ contract Eggs is ERC721Enumerable,Ownable{
         incubator = VoucherIncubators(_incubator);
     }
 
+    function withdrawBalance() external onlyOwner{
+        USDC.transferFrom(address(this),msg.sender,USDC.balanceOf(address(this)));
+        Grav.transferFrom(address(this),msg.sender,Grav.balanceOf(address(this)));
+    }
+
     function setImageURI(string memory base,string memory fileType) external onlyOwner{
         baseURI = base;
         imageFileType = fileType;
     }
 
-
+    function togglePaused() external onlyOwner{
+        paused = !paused;
+    }
 
 }
