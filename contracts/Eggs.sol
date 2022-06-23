@@ -17,7 +17,7 @@ interface Iwhitelistvouchers is IERC721{
     function checkIfPreminted(uint256 _tokenId) external view returns (bool);
 }
 
-interface VoucherIncubators {
+interface VoucherIncubators is IERC721{
     function giveVoucherIncubator(uint256 _amountOfTickets, address _receiver)
         external;
 }
@@ -32,6 +32,9 @@ contract Eggs is ERC721Enumerable,Ownable{
     VoucherIncubators incubator;
 
     address public paymentReceiver;
+
+    bool USDCAllowed;
+    bool GravAllowed;
 
     struct Egg {
         uint Breed; //@notice check which Breed ( Dragon, Fish, Slime, Snake, Stone) Layer to use
@@ -66,6 +69,7 @@ contract Eggs is ERC721Enumerable,Ownable{
 
     bool public Phase1;
     bool public wlPhase;
+    bool public incubatorSale;
 
     string public baseURI;
     string public imageFileType;
@@ -88,16 +92,17 @@ contract Eggs is ERC721Enumerable,Ownable{
     string[5] public CapsuleColor = ["gold","purple","red","blue","gray"];
     string[6] public BgColor = ["purple","green","red","pink","gray","black"];
 
-    uint[4] public total = [5555,5555,5555,5555];
+    uint[5] public total = [5555,5555,5555,5555,5555];
 
     bool paused;
 
-    constructor(address _grav,address _usdc,address _wlvoucher,address _incubators) ERC721("OneVerse Eggs","EGG"){
+    constructor(address _grav,address _usdc,address _wlvoucher,address _incubators,address _paymentReceiver) ERC721("OneVerse Eggs","EGG"){
         Grav = IERC20(_grav);
         USDC = IERC20(_usdc);
         wlVoucher = Iwhitelistvouchers(_wlvoucher);
         incubator = VoucherIncubators(_incubators);
         wlPhase = true;
+        paymentReceiver = _paymentReceiver;
     }
 
     modifier notPaused {
@@ -105,7 +110,7 @@ contract Eggs is ERC721Enumerable,Ownable{
         _;
     }
 
-    function mint(uint256[] calldata _whitelistID) external notPaused{
+    function mint(uint256[] calldata _whitelistID,bool USDC_Payment) external notPaused{
         require(msg.sender == tx.origin,"Contract not allowed");
         require(wlPhase,"Neither phase 1 or 2");
         uint length = _whitelistID.length;
@@ -125,9 +130,15 @@ contract Eggs is ERC721Enumerable,Ownable{
                 require(USDC.transferFrom(msg.sender, paymentReceiver, price),"Price not paid");
                 incubator.giveVoucherIncubator(redeemable,msg.sender);
             }else{
-                //TODO add in vote based toggle
-                price = gravFee[0] * redeemable;
-                require(Grav.transferFrom(msg.sender, paymentReceiver, price),"Price not paid");
+                if(USDC_Payment && USDCAllowed){
+                    require(USDC.transferFrom(msg.sender,paymentReceiver,usdcFee[1]*redeemable),"Not paid");
+                }
+                else if(!USDC_Payment && GravAllowed){
+                    require(Grav.transferFrom(msg.sender,paymentReceiver,gravFee[0]*redeemable),"Not paid");
+                }
+                else{
+                    revert("Invalid payment option");
+                }
             }
             uint random = uint(vrf());
             for(uint k=0;k<redeemable;k++){
@@ -140,12 +151,76 @@ contract Eggs is ERC721Enumerable,Ownable{
     }
 
     function publicMint(uint256 _mintAmount, bool USDC_Payment) external notPaused{
+        require(_mintAmount <= 10,"Only max 10 mints at once");
         require(!wlPhase,"Phase 3 not started yet");
         require(MAX_SUPPLY >= tokenID + _mintAmount,"Max supply reached");
         require(msg.sender == tx.origin,"Contract not allowed");
-        if(USDC_Payment){
-
+        if(USDC_Payment && USDCAllowed){
+            require(USDC.transferFrom(msg.sender,paymentReceiver,usdcFee[2]*_mintAmount),"Not paid");
         }
+        else if(!USDC_Payment && GravAllowed){
+            require(Grav.transferFrom(msg.sender,paymentReceiver,gravFee[1]*_mintAmount),"Not paid");
+        }
+        else{
+            revert("Invalid payment option");
+        }
+        uint random = uint(vrf());
+        for(uint k=0;k<_mintAmount;k++){
+            tokenID++;
+            _safeMint(msg.sender, tokenID);
+            EggsMetadata[tokenID] = generateEgg(random, k);
+        }
+    }
+
+    function buyIncubator(uint256[] calldata _tokenIdsEggs) external{
+        require(msg.sender == tx.origin, "Contracts not allowed!");
+        require(incubatorSale,"Sale not started");
+        uint length = _tokenIdsEggs.length;
+        uint random = uint(vrf());
+        for(uint i=0;i<length;i++){
+            require(ownerOf(_tokenIdsEggs[i]) == msg.sender,"Not owner");
+            require(!EggsMetadata[_tokenIdsEggs[i]].hasIncubator,"already incubated");
+            generateIncubator(_tokenIdsEggs[i], random, i);            
+        }
+        Grav.transferFrom(msg.sender,paymentReceiver,incubatorFee*_tokenIdsEggs.length);
+    }
+
+    function redeemIncubator(
+        uint256[] calldata _tokenIdsEggs,
+        uint256[] calldata _tokenIdsVouchers
+    ) external {
+        require(msg.sender == tx.origin,"Contract not allowed");
+        require(incubatorSale,"Sale not started");
+        require(_tokenIdsEggs.length == _tokenIdsVouchers.length,"Length mismatch");
+        uint length = _tokenIdsEggs.length;
+        uint random = uint(vrf());
+        for(uint i=0;i<length;i++){
+            require(ownerOf(_tokenIdsEggs[i])==msg.sender,"Not egg owner");
+            require(incubator.ownerOf(_tokenIdsVouchers[i])==msg.sender,"Not voucher owner");
+            require(!EggsMetadata[_tokenIdsEggs[i]].hasIncubator,"Already incubated");
+            incubator.transferFrom(msg.sender,address(this),_tokenIdsVouchers[i]);
+            generateIncubator(_tokenIdsEggs[i], random, i);
+        }
+    }
+
+    function generateIncubator(uint tokenId,uint random,uint salt) private {
+            random = uint(keccak256(abi.encodePacked(random,salt)));
+
+            uint randSliced = random % total[4];
+            uint cumulative = 0;
+
+            for(uint j=0;j<CAPSULERARITY.length;j++){
+                if(randSliced < cumulative + CAPSULERARITY[j]){
+                    EggsMetadata[tokenId].incubatorColour = j;
+                    CAPSULERARITY[j]--;
+                    total[4]--;
+                    break;
+                }
+                else{
+                    cumulative += CAPSULERARITY[j];
+                }
+            }
+            EggsMetadata[tokenId].hasIncubator = true;
     }
 
     function generateEgg(uint random,uint salt)
@@ -372,6 +447,18 @@ contract Eggs is ERC721Enumerable,Ownable{
 
     function togglePaused() external onlyOwner{
         paused = !paused;
+    }
+
+    function toggleUSDCPayment() external onlyOwner{
+        USDCAllowed = !USDCAllowed;
+    }
+
+    function toggleGravPayment() external onlyOwner{
+        GravAllowed = !GravAllowed;
+    }
+
+    function toggleIncubatorSale() external onlyOwner{
+        incubatorSale = !incubatorSale;
     }
 
 }
