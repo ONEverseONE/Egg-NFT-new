@@ -63,12 +63,13 @@ contract Eggs is ERC721Enumerable,Ownable{
     uint PAHSE_1_SUPPLY = 1000;
 
     bool public Phase1;
+    bool public wlPhase;
+
     string public baseURI;
     string public imageFileType;
 
     mapping(uint=>Egg) EggsMetadata;
 
-    //TODO: ADD NUMBERS IN THE ARRAY
     uint256[5][5] private COLOURRARITY = [[31,81,222,333,444],
                                         [31,81,222,333,444],
                                         [31,81,222,333,444],
@@ -79,15 +80,32 @@ contract Eggs is ERC721Enumerable,Ownable{
     uint256[5] private CAPSULERARITY = [155,400,1110,1665,2225];
     uint256[5] private BREEDRARITY = [1111,1111,1111,1111,1111];
 
+    string[5] private EggColor = ["gold","purple","red","blue","gray"];
+    string[4] private FogColor = ["green","purple","white","none"];
+    string[5] private BreedName = ["draconesh","ichthia","khusatzal","lasseateran","mixoteran"];
+    string[5] private CapsuleColor = ["gold","purple","red","blue","gray"];
+    string[6] private BgColor = ["purple","green","red","pink","gray","black"];
+
     uint[4] public total = [5555,5555,5555,5555];
 
-    constructor(address _grav,address _usdc) ERC721("OneVerse Eggs","EGG"){
+    bool paused;
+
+    constructor(address _grav,address _usdc,address _wlvoucher,address _incubators) ERC721("OneVerse Eggs","EGG"){
         Grav = IERC20(_grav);
         USDC = IERC20(_usdc);
+        wlVoucher = Iwhitelistvouchers(_wlvoucher);
+        incubator = VoucherIncubators(_incubators);
+        wlPhase = true;
     }
 
-    function mint(uint256[] calldata _whitelistID) external{
+    modifier notPaused {
+        require(!paused,"Execution paused");
+        _;
+    }
+
+    function mint(uint256[] calldata _whitelistID) external notPaused{
         require(msg.sender == tx.origin,"Contract not allowed");
+        require(wlPhase,"Neither phase 1 or 2");
         uint length = _whitelistID.length;
 
         for(uint i=0;i<length;i++){
@@ -222,84 +240,21 @@ contract Eggs is ERC721Enumerable,Ownable{
         }
     }
 
-function tokenURI(uint256 _tokenId)
-        public
-        view
-        override
-        returns (string memory)
-    {
+    function tokenURI(uint256 _tokenId)
+            public
+            view
+            override
+            returns (string memory)
+        {
         Egg memory EggAttributes = EggsMetadata[_tokenId];
 
         string memory hasIncubator = EggAttributes.hasIncubator ? "yes" : "no";
 
-        string memory eggcolor;
-        if (uint8(EggAttributes.EggColour) == 0) {
-            eggcolor = "gold";
-        } else if (uint8(EggAttributes.EggColour) == 1) {
-            eggcolor = "purple";
-        } else if (uint8(EggAttributes.EggColour) == 2) {
-            eggcolor = "red";
-        } else if (uint8(EggAttributes.EggColour) == 3) {
-            eggcolor = "blue";
-        } else if (uint8(EggAttributes.EggColour) == 4) {
-            eggcolor = "gray";
-        }
-
-        string memory fogcolor;
-        if (uint8(EggAttributes.FogColour) == 0) {
-            fogcolor = "green";
-        } else if (uint8(EggAttributes.FogColour) == 1) {
-            fogcolor = "purple";
-        } else if (uint8(EggAttributes.FogColour) == 2) {
-            fogcolor = "white";
-        } else if (uint8(EggAttributes.FogColour) == 3) {
-            fogcolor = "none";
-        }
-
-        string memory breedtype;
-        if (uint8(EggAttributes.Breed) == 0) {
-            breedtype = "draconesh";
-        } else if (uint8(EggAttributes.Breed) == 1) {
-            breedtype = "ichthia";
-        } else if (uint8(EggAttributes.Breed) == 2) {
-            breedtype = "khusatzal";
-        } else if (uint8(EggAttributes.Breed) == 3) {
-            breedtype = "lasseateran";
-        } else if (uint8(EggAttributes.Breed) == 4) {
-            breedtype = "mixoteran";
-        }
-
-        string memory incubatorColor;
-        if (
-            uint8(EggAttributes.incubatorColour) == 0 &&
-            EggAttributes.hasIncubator
-        ) {
-            incubatorColor = "gold";
-        } else if (uint8(EggAttributes.incubatorColour) == 1) {
-            incubatorColor = "purple";
-        } else if (uint8(EggAttributes.incubatorColour) == 2) {
-            incubatorColor = "red";
-        } else if (uint8(EggAttributes.incubatorColour) == 3) {
-            incubatorColor = "blue";
-        } else if (uint8(EggAttributes.incubatorColour) == 4) {
-            incubatorColor = "gray";
-        } else {
-            incubatorColor = "N/A";
-        }
-        string memory backgroundcolor;
-        if (uint8(EggAttributes.BackgroundColour) == 0) {
-            backgroundcolor = "purple";
-        } else if (uint8(EggAttributes.BackgroundColour) == 1) {
-            backgroundcolor = "green";
-        } else if (uint8(EggAttributes.BackgroundColour) == 2) {
-            backgroundcolor = "red";
-        } else if (uint8(EggAttributes.BackgroundColour) == 3) {
-            backgroundcolor = "pink";
-        } else if (uint8(EggAttributes.BackgroundColour) == 4) {
-            backgroundcolor = "gray";
-        } else if (uint8(EggAttributes.BackgroundColour) == 5) {
-            backgroundcolor = "black";
-        }
+        string memory eggcolor = EggColor[EggAttributes.EggColour];
+        string memory fogcolor = FogColor[EggAttributes.FogColour];
+        string memory breedtype = BreedName[EggAttributes.Breed];
+        string memory incubatorColor = EggAttributes.hasIncubator ? CapsuleColor[EggAttributes.incubatorColour] : "N/A";
+        string memory backgroundcolor = BgColor[EggAttributes.BackgroundColour];
 
         string memory title = "Egg";
         string memory picture = string.concat(
@@ -373,6 +328,26 @@ function tokenURI(uint256 _tokenId)
 
     function setPhase1Supply(uint _supply) external onlyOwner{
         PAHSE_1_SUPPLY = _supply;
+    }
+
+    function toggleWLPhase() external onlyOwner{
+        wlPhase = !wlPhase;
+    }
+
+    function setGrav(address _grav) external onlyOwner{
+        Grav = IERC20(_grav);
+    }
+
+    function setUSDC(address _usdc) external onlyOwner{
+        USDC = IERC20(_usdc);
+    }
+
+    function setWLVoucher(address _voucher) external onlyOwner{
+        wlVoucher = Iwhitelistvouchers(_voucher);
+    }
+
+    function setIncubator(address _incubator) external onlyOwner{
+        incubator = VoucherIncubators(_incubator);
     }
 
     function setImageURI(string memory base,string memory fileType) external onlyOwner{
