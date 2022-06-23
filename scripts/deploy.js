@@ -74,7 +74,7 @@ async function main() {
   await hre.run("verify:verify", {
     address: voucher.address,
     constructorArguments: [grav.address],
-    contract: "contracts/Mocks/WhitelistVoucher.sol:WhitelistVoucher",
+    contract: "contracts/WhitelistVoucher.sol:WhitelistVoucher",
     network: "harmony",
   });
 
