@@ -31,6 +31,8 @@ contract Eggs is ERC721Enumerable,Ownable{
     Iwhitelistvouchers wlVoucher;
     VoucherIncubators incubator;
 
+    address public paymentReceiver;
+
     struct Egg {
         uint Breed; //@notice check which Breed ( Dragon, Fish, Slime, Snake, Stone) Layer to use
         uint EggColour; //@notice check which EggColour Layer to use                                      @TODO DNA
@@ -70,21 +72,21 @@ contract Eggs is ERC721Enumerable,Ownable{
 
     mapping(uint=>Egg) EggsMetadata;
 
-    uint256[5][5] private COLOURRARITY = [[31,81,222,333,444],
+    uint256[5][5] public COLOURRARITY = [[31,81,222,333,444],
                                         [31,81,222,333,444],
                                         [31,81,222,333,444],
                                         [31,81,222,333,444],
                                         [31,81,222,333,444]];
-    uint256[4] private FOGRARITY = [100,555,1567,3333];
-    uint256[6] private BACKGROUNDRARITY = [100,255,400,1110,1465,2225];
-    uint256[5] private CAPSULERARITY = [155,400,1110,1665,2225];
-    uint256[5] private BREEDRARITY = [1111,1111,1111,1111,1111];
+    uint256[4] public FOGRARITY = [100,555,1567,3333];
+    uint256[6] public BACKGROUNDRARITY = [100,255,400,1110,1465,2225];
+    uint256[5] public CAPSULERARITY = [155,400,1110,1665,2225];
+    uint256[5] public BREEDRARITY = [1111,1111,1111,1111,1111];
 
-    string[5] private EggColor = ["gold","purple","red","blue","gray"];
-    string[4] private FogColor = ["green","purple","white","none"];
-    string[5] private BreedName = ["draconesh","ichthia","khusatzal","lasseateran","mixoteran"];
-    string[5] private CapsuleColor = ["gold","purple","red","blue","gray"];
-    string[6] private BgColor = ["purple","green","red","pink","gray","black"];
+    string[5] public EggColor = ["gold","purple","red","blue","gray"];
+    string[4] public FogColor = ["green","purple","white","none"];
+    string[5] public BreedName = ["draconesh","ichthia","khusatzal","lasseateran","mixoteran"];
+    string[5] public CapsuleColor = ["gold","purple","red","blue","gray"];
+    string[6] public BgColor = ["purple","green","red","pink","gray","black"];
 
     uint[4] public total = [5555,5555,5555,5555];
 
@@ -120,12 +122,12 @@ contract Eggs is ERC721Enumerable,Ownable{
             if(Phase1){
                 require(PAHSE_1_SUPPLY >= tokenID + redeemable,"Phase limit reached");
                 price = usdcFee[0] * redeemable;
-                require(USDC.transferFrom(msg.sender, address(this), price),"Price not paid");
+                require(USDC.transferFrom(msg.sender, paymentReceiver, price),"Price not paid");
                 incubator.giveVoucherIncubator(redeemable,msg.sender);
             }else{
                 //TODO add in vote based toggle
                 price = gravFee[0] * redeemable;
-                require(Grav.transferFrom(msg.sender, address(this), price),"Price not paid");
+                require(Grav.transferFrom(msg.sender, paymentReceiver, price),"Price not paid");
             }
             uint random = uint(vrf());
             for(uint k=0;k<redeemable;k++){
@@ -359,9 +361,8 @@ contract Eggs is ERC721Enumerable,Ownable{
         incubator = VoucherIncubators(_incubator);
     }
 
-    function withdrawBalance() external onlyOwner{
-        USDC.transferFrom(address(this),msg.sender,USDC.balanceOf(address(this)));
-        Grav.transferFrom(address(this),msg.sender,Grav.balanceOf(address(this)));
+    function setPaymentReceiver(address _receiver) external onlyOwner{
+        paymentReceiver = _receiver;
     }
 
     function setImageURI(string memory base,string memory fileType) external onlyOwner{
