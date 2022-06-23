@@ -205,7 +205,7 @@ contract Eggs is ERC721Enumerable,Ownable{
     }
 
     function generateIncubator(uint tokenId,uint random,uint salt) private {
-            random = uint(keccak256(abi.encodePacked(random,salt)));
+            random = uint(keccak256(abi.encodePacked(tokenId,random,salt)));
 
             uint randSliced = random % total[4];
             uint cumulative = 0;
@@ -235,7 +235,7 @@ contract Eggs is ERC721Enumerable,Ownable{
         uint fogColourToAssign;
         uint backgroundColourToAssign;
 
-        random = uint(keccak256(abi.encodePacked(random,salt)));
+        random = uint(keccak256(abi.encodePacked(tokenID,random,salt)));
 
         uint randSliced = random % total[0];
         random /= 10000;
