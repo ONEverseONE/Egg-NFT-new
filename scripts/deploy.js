@@ -15,9 +15,7 @@ async function main() {
   // await hre.run('compile');
 
   // We get the contract to deploy
-  const NFT = await hre.ethers.getContractFactory("NFT");
-  const nft = await NFT.deploy();
-  console.log("Puff deployed to:", nft.address);
+
   const Grav = await hre.ethers.getContractFactory("Token");
   const grav = await Grav.deploy();
   console.log("Grav deployed to:", grav.address);
@@ -45,12 +43,6 @@ async function main() {
 
   console.log("Eggs deployed to:", egg.address);
   await incubator.changeEggContract(egg.address);
-
-  await hre.run("verify:verify", {
-    address: nft.address,
-    contract: "contracts/Mocks/NFT.sol:NFT",
-    network: "harmony",
-  });
 
   await hre.run("verify:verify", {
     address: grav.address,
