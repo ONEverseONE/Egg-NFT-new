@@ -258,7 +258,7 @@ contract Eggs is ERC721Enumerable,Ownable{
 
         cumulative = 0;
 
-        for (uint256 i = 0; i < COLOURRARITY.length; i++) {
+        for (uint256 i = 0; i < COLOURRARITY[breedToAssign].length; i++) {
             if (randSliced < cumulative + COLOURRARITY[breedToAssign][i]) 
             {
                 eggColourToAssign = i;
