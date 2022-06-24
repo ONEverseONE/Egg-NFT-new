@@ -253,7 +253,7 @@ contract Eggs is ERC721Enumerable,Ownable{
             }
         }
 
-        randSliced = random % total[1];
+        randSliced = random % (BREEDRARITY[breedToAssign]+1);
         random /= 10000;
 
         cumulative = 0;
