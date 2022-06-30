@@ -7,6 +7,8 @@ import "@openzeppelin/contracts/interfaces/IERC20.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 import "@openzeppelin/contracts/utils/Base64.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
+import "@chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol";
+import "@chainlink/contracts/src/v0.8/VRFConsumerBaseV2.sol";
 
 interface Iwhitelistvouchers is IERC721{
     function checkRedeemableEggs(uint256 _tokenId)
@@ -22,7 +24,7 @@ interface VoucherIncubators is IERC721{
         external;
 }
 
-contract Eggs is ERC721Enumerable,Ownable{
+contract Eggs is ERC721Enumerable,Ownable,VRFConsumerBaseV2{
 
 
     IERC20 Grav;
@@ -30,6 +32,8 @@ contract Eggs is ERC721Enumerable,Ownable{
 
     Iwhitelistvouchers wlVoucher;
     VoucherIncubators incubator;
+
+    VRFCoordinatorV2Interface COORDINATOR;
 
     address public paymentReceiver;
 
@@ -46,6 +50,11 @@ contract Eggs is ERC721Enumerable,Ownable{
         uint256 incubatorLevel; //@notice check which Capsule Progression Bar Layer to use
         uint256[5] TimeOfLeveling;
         bool wasPreminted;
+    }
+
+    struct request{
+        uint amount;
+        bool egg;
     }
 
 
@@ -75,6 +84,8 @@ contract Eggs is ERC721Enumerable,Ownable{
     string public imageFileType;
 
     mapping(uint=>Egg) EggsMetadata;
+    mapping(uint=>request) requestToInfo;
+    mapping(uint=>uint[]) requestToEggs;
 
     uint256[5][5] public COLOURRARITY = [[31,81,222,333,444],
                                         [31,81,222,333,444],
@@ -96,7 +107,32 @@ contract Eggs is ERC721Enumerable,Ownable{
 
     bool paused;
 
-    constructor(address _grav,address _usdc,address _wlvoucher,address _incubators,address _paymentReceiver) ERC721("OneVerse Eggs","EGG"){
+    //vrf
+    // Your subscription ID.
+    uint64 s_subscriptionId;
+
+    // Rinkeby coordinator. For other networks,
+    // see https://docs.chain.link/docs/vrf-contracts/#configurations
+    address vrfCoordinator = 0x7a1BaC17Ccc5b313516C5E16fb24f7659aA5ebed;
+
+    // The gas lane to use, which specifies the maximum gas price to bump to.
+    // For a list of available gas lanes on each network,
+    // see https://docs.chain.link/docs/vrf-contracts/#configurations
+    bytes32 keyHash = 0x4b09e658ed251bcafeebbc69400383d49f344ace09b9576fe248bb02c003fe9f;
+
+    // Depends on the number of requested values that you want sent to the
+    // fulfillRandomWords() function. Storing each word costs about 20,000 gas,
+    // so 100,000 is a safe default for this example contract. Test and adjust
+    // this limit based on the network that you select, the size of the request,
+    // and the processing of the callback request in the fulfillRandomWords()
+    // function.
+    uint32 callbackGasLimit = 2500000;
+
+    // The default is 3, but you can set this higher.
+    uint16 requestConfirmations = 3;
+
+    constructor(address _grav,address _usdc,address _wlvoucher,address _incubators,address _paymentReceiver,uint64 subscriptionId) ERC721("OneVerse Eggs","EGG")
+    VRFConsumerBaseV2(vrfCoordinator){
         Grav = IERC20(_grav);
         USDC = IERC20(_usdc);
         wlVoucher = Iwhitelistvouchers(_wlvoucher);
@@ -104,6 +140,7 @@ contract Eggs is ERC721Enumerable,Ownable{
         wlPhase = true;
         Phase1 = true;
         paymentReceiver = _paymentReceiver;
+        s_subscriptionId = subscriptionId;
     }
 
     modifier notPaused {
@@ -141,14 +178,44 @@ contract Eggs is ERC721Enumerable,Ownable{
                     revert("Invalid payment option");
                 }
             }
-            uint random = uint(vrf());
+
+            uint requestId = COORDINATOR.requestRandomWords(
+                keyHash,
+                s_subscriptionId,
+                requestConfirmations,
+                callbackGasLimit,
+                1
+                );
+            
+            requestToInfo[requestId] = request(redeemable,true);
             for(uint k=0;k<redeemable;k++){
                 tokenID++;
                 _safeMint(msg.sender, tokenID);
-                EggsMetadata[tokenID] = generateEgg(random, k);
+                // EggsMetadata[tokenID] = generateEgg(random, k);
             }
             
         }
+    }
+
+    function fulfillRandomWords(
+    uint256 requestId, /* requestId */
+    uint256[] memory randomWords
+    ) internal override {
+    // s_randomWords = randomWords;
+    request storage redeemable = requestToInfo[requestId];
+    if(redeemable.egg){
+        for(uint k=0;k<redeemable.amount;k++){
+            tokenID++;
+            _safeMint(msg.sender, tokenID);
+            EggsMetadata[tokenID] = generateEgg(randomWords[0], k);
+        }
+    }
+    else{
+        for(uint i=0;i<redeemable.amount;i++){
+            generateIncubator(requestToEggs[requestId][i], randomWords[0], i);
+        }
+    }
+    
     }
 
     function publicMint(uint256 _mintAmount, bool USDC_Payment) external notPaused{
@@ -165,24 +232,41 @@ contract Eggs is ERC721Enumerable,Ownable{
         else{
             revert("Invalid payment option");
         }
-        uint random = uint(vrf());
-        for(uint k=0;k<_mintAmount;k++){
-            tokenID++;
-            _safeMint(msg.sender, tokenID);
-            EggsMetadata[tokenID] = generateEgg(random, k);
-        }
+        uint requestId = COORDINATOR.requestRandomWords(
+                keyHash,
+                s_subscriptionId,
+                requestConfirmations,
+                callbackGasLimit,
+                1
+                );
+
+        requestToInfo[requestId] = request(_mintAmount,true);
+
+        // for(uint k=0;k<_mintAmount;k++){
+        //     tokenID++;
+        //     _safeMint(msg.sender, tokenID);
+        //     EggsMetadata[tokenID] = generateEgg(random, k);
+        // }
     }
 
     function buyIncubator(uint256[] calldata _tokenIdsEggs) external{
         require(msg.sender == tx.origin, "Contracts not allowed!");
         require(incubatorSale,"Sale not started");
         uint length = _tokenIdsEggs.length;
-        uint random = uint(vrf());
+        // uint random = uint(vrf());
+        uint requestId = COORDINATOR.requestRandomWords(
+                keyHash,
+                s_subscriptionId,
+                requestConfirmations,
+                callbackGasLimit,
+                1
+                );
         for(uint i=0;i<length;i++){
             require(ownerOf(_tokenIdsEggs[i]) == msg.sender,"Not owner");
             require(!EggsMetadata[_tokenIdsEggs[i]].hasIncubator,"already incubated");
-            generateIncubator(_tokenIdsEggs[i], random, i);            
         }
+        requestToInfo[requestId] = request(length,false);
+        requestToEggs[requestId] = _tokenIdsEggs;
         Grav.transferFrom(msg.sender,paymentReceiver,incubatorFee*_tokenIdsEggs.length);
     }
 
@@ -194,14 +278,21 @@ contract Eggs is ERC721Enumerable,Ownable{
         require(incubatorSale,"Sale not started");
         require(_tokenIdsEggs.length == _tokenIdsVouchers.length,"Length mismatch");
         uint length = _tokenIdsEggs.length;
-        uint random = uint(vrf());
+        uint requestId = COORDINATOR.requestRandomWords(
+                keyHash,
+                s_subscriptionId,
+                requestConfirmations,
+                callbackGasLimit,
+                1
+                );
         for(uint i=0;i<length;i++){
             require(ownerOf(_tokenIdsEggs[i])==msg.sender,"Not egg owner");
             require(incubator.ownerOf(_tokenIdsVouchers[i])==msg.sender,"Not voucher owner");
             require(!EggsMetadata[_tokenIdsEggs[i]].hasIncubator,"Already incubated");
             incubator.transferFrom(msg.sender,address(this),_tokenIdsVouchers[i]);
-            generateIncubator(_tokenIdsEggs[i], random, i);
         }
+        requestToInfo[requestId] = request(length,false);
+        requestToEggs[requestId] = _tokenIdsEggs;
     }
 
     function generateIncubator(uint tokenId,uint random,uint salt) private {
@@ -315,17 +406,17 @@ contract Eggs is ERC721Enumerable,Ownable{
         return newEgg;
     }
 
-    function vrf() private view returns (bytes32 result) {
-        uint256[1] memory bn;
-        bn[0] = block.number;
-        assembly {
-            let memPtr := mload(0x40)
-            if iszero(staticcall(not(0), 0xff, bn, 0x20, memPtr, 0x20)) {
-                invalid()
-            }
-            result := mload(memPtr)
-        }
-    }
+    // function vrf() private view returns (bytes32 result) {
+    //     uint256[1] memory bn;
+    //     bn[0] = block.number;
+    //     assembly {
+    //         let memPtr := mload(0x40)
+    //         if iszero(staticcall(not(0), 0xff, bn, 0x20, memPtr, 0x20)) {
+    //             invalid()
+    //         }
+    //         result := mload(memPtr)
+    //     }
+    // }
 
     function tokenURI(uint256 _tokenId)
             public
