@@ -266,6 +266,7 @@ contract Eggs is ERC721Enumerable,Ownable,VRFConsumerBaseV2{
         for(uint i=0;i<length;i++){
             require(ownerOf(_tokenIdsEggs[i]) == msg.sender,"Not owner");
             require(!EggsMetadata[_tokenIdsEggs[i]].hasIncubator,"already incubated");
+            EggsMetadata[_tokenIdsEggs[i]].hasIncubator = true;
         }
         requestToInfo[requestId] = request(msg.sender,length,false);
         requestToEggs[requestId] = _tokenIdsEggs;
@@ -276,7 +277,6 @@ contract Eggs is ERC721Enumerable,Ownable,VRFConsumerBaseV2{
         uint256[] calldata _tokenIdsEggs,
         uint256[] calldata _tokenIdsVouchers
     ) external {
-        // require(msg.sender == tx.origin,"Contract not allowed");
         require(incubatorSale,"Sale not started");
         require(_tokenIdsEggs.length == _tokenIdsVouchers.length,"Length mismatch");
         uint length = _tokenIdsEggs.length;
@@ -292,6 +292,7 @@ contract Eggs is ERC721Enumerable,Ownable,VRFConsumerBaseV2{
             require(incubator.ownerOf(_tokenIdsVouchers[i])==msg.sender,"Not voucher owner");
             require(!EggsMetadata[_tokenIdsEggs[i]].hasIncubator,"Already incubated");
             incubator.transferFrom(msg.sender,address(this),_tokenIdsVouchers[i]);
+            EggsMetadata[_tokenIdsEggs[i]].hasIncubator = true;
         }
         requestToInfo[requestId] = request(msg.sender,length,false);
         requestToEggs[requestId] = _tokenIdsEggs;
@@ -314,7 +315,7 @@ contract Eggs is ERC721Enumerable,Ownable,VRFConsumerBaseV2{
                     cumulative += CAPSULERARITY[j];
                 }
             }
-            EggsMetadata[tokenId].hasIncubator = true;
+            // EggsMetadata[tokenId].hasIncubator = true;
     }
 
     function generateEgg(uint random,uint salt)
@@ -407,18 +408,6 @@ contract Eggs is ERC721Enumerable,Ownable,VRFConsumerBaseV2{
 
         return newEgg;
     }
-
-    // function vrf() private view returns (bytes32 result) {
-    //     uint256[1] memory bn;
-    //     bn[0] = block.number;
-    //     assembly {
-    //         let memPtr := mload(0x40)
-    //         if iszero(staticcall(not(0), 0xff, bn, 0x20, memPtr, 0x20)) {
-    //             invalid()
-    //         }
-    //         result := mload(memPtr)
-    //     }
-    // }
 
     function tokenURI(uint256 _tokenId)
             public
