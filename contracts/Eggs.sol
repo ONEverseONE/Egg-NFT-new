@@ -53,6 +53,7 @@ contract Eggs is ERC721Enumerable,Ownable,VRFConsumerBaseV2{
     }
 
     struct request{
+        address sender;
         uint amount;
         bool egg;
     }
@@ -85,7 +86,7 @@ contract Eggs is ERC721Enumerable,Ownable,VRFConsumerBaseV2{
 
     mapping(uint=>Egg) EggsMetadata;
     mapping(uint=>request) requestToInfo;
-    mapping(uint=>uint[]) requestToEggs;
+    mapping(uint=>uint[]) public requestToEggs;
 
     uint256[5][5] public COLOURRARITY = [[31,81,222,333,444],
                                         [31,81,222,333,444],
@@ -126,7 +127,7 @@ contract Eggs is ERC721Enumerable,Ownable,VRFConsumerBaseV2{
     // this limit based on the network that you select, the size of the request,
     // and the processing of the callback request in the fulfillRandomWords()
     // function.
-    uint32 callbackGasLimit = 2500000;
+    uint32 callbackGasLimit = 2000000;
 
     // The default is 3, but you can set this higher.
     uint16 requestConfirmations = 3;
@@ -141,6 +142,7 @@ contract Eggs is ERC721Enumerable,Ownable,VRFConsumerBaseV2{
         Phase1 = true;
         paymentReceiver = _paymentReceiver;
         s_subscriptionId = subscriptionId;
+        COORDINATOR = VRFCoordinatorV2Interface(vrfCoordinator);
     }
 
     modifier notPaused {
@@ -149,7 +151,7 @@ contract Eggs is ERC721Enumerable,Ownable,VRFConsumerBaseV2{
     }
 
     function mint(uint256[] calldata _whitelistID,bool USDC_Payment) external notPaused{
-        require(msg.sender == tx.origin,"Contract not allowed");
+        // require(msg.sender == tx.origin,"Contract not allowed");
         require(wlPhase,"Neither phase 1 or 2");
         uint length = _whitelistID.length;
 
@@ -187,17 +189,17 @@ contract Eggs is ERC721Enumerable,Ownable,VRFConsumerBaseV2{
                 1
                 );
             
-            requestToInfo[requestId] = request(redeemable,true);
-            for(uint k=0;k<redeemable;k++){
-                tokenID++;
-                _safeMint(msg.sender, tokenID);
-                // EggsMetadata[tokenID] = generateEgg(random, k);
-            }
+            requestToInfo[requestId] = request(msg.sender,redeemable,true);
+            // for(uint k=0;k<redeemable;k++){
+            //     tokenID++;
+            //     _safeMint(msg.sender, tokenID);
+            //     // EggsMetadata[tokenID] = generateEgg(random, k);
+            // }
             
         }
     }
 
-    function fulfillRandomWords(
+        function fulfillRandomWords(
     uint256 requestId, /* requestId */
     uint256[] memory randomWords
     ) internal override {
@@ -206,7 +208,7 @@ contract Eggs is ERC721Enumerable,Ownable,VRFConsumerBaseV2{
     if(redeemable.egg){
         for(uint k=0;k<redeemable.amount;k++){
             tokenID++;
-            _safeMint(msg.sender, tokenID);
+            _safeMint(redeemable.sender, tokenID);
             EggsMetadata[tokenID] = generateEgg(randomWords[0], k);
         }
     }
@@ -222,7 +224,7 @@ contract Eggs is ERC721Enumerable,Ownable,VRFConsumerBaseV2{
         require(_mintAmount <= 10,"Only max 10 mints at once");
         require(!wlPhase,"Phase 3 not started yet");
         require(MAX_SUPPLY >= tokenID + _mintAmount,"Max supply reached");
-        require(msg.sender == tx.origin,"Contract not allowed");
+        // require(msg.sender == tx.origin,"Contract not allowed");
         if(USDC_Payment && USDCAllowed){
             require(USDC.transferFrom(msg.sender,paymentReceiver,usdcFee[2]*_mintAmount),"Not paid");
         }
@@ -240,7 +242,7 @@ contract Eggs is ERC721Enumerable,Ownable,VRFConsumerBaseV2{
                 1
                 );
 
-        requestToInfo[requestId] = request(_mintAmount,true);
+        requestToInfo[requestId] = request(msg.sender,_mintAmount,true);
 
         // for(uint k=0;k<_mintAmount;k++){
         //     tokenID++;
@@ -250,7 +252,7 @@ contract Eggs is ERC721Enumerable,Ownable,VRFConsumerBaseV2{
     }
 
     function buyIncubator(uint256[] calldata _tokenIdsEggs) external{
-        require(msg.sender == tx.origin, "Contracts not allowed!");
+        // require(msg.sender == tx.origin, "Contracts not allowed!");
         require(incubatorSale,"Sale not started");
         uint length = _tokenIdsEggs.length;
         // uint random = uint(vrf());
@@ -265,7 +267,7 @@ contract Eggs is ERC721Enumerable,Ownable,VRFConsumerBaseV2{
             require(ownerOf(_tokenIdsEggs[i]) == msg.sender,"Not owner");
             require(!EggsMetadata[_tokenIdsEggs[i]].hasIncubator,"already incubated");
         }
-        requestToInfo[requestId] = request(length,false);
+        requestToInfo[requestId] = request(msg.sender,length,false);
         requestToEggs[requestId] = _tokenIdsEggs;
         Grav.transferFrom(msg.sender,paymentReceiver,incubatorFee*_tokenIdsEggs.length);
     }
@@ -274,7 +276,7 @@ contract Eggs is ERC721Enumerable,Ownable,VRFConsumerBaseV2{
         uint256[] calldata _tokenIdsEggs,
         uint256[] calldata _tokenIdsVouchers
     ) external {
-        require(msg.sender == tx.origin,"Contract not allowed");
+        // require(msg.sender == tx.origin,"Contract not allowed");
         require(incubatorSale,"Sale not started");
         require(_tokenIdsEggs.length == _tokenIdsVouchers.length,"Length mismatch");
         uint length = _tokenIdsEggs.length;
@@ -291,7 +293,7 @@ contract Eggs is ERC721Enumerable,Ownable,VRFConsumerBaseV2{
             require(!EggsMetadata[_tokenIdsEggs[i]].hasIncubator,"Already incubated");
             incubator.transferFrom(msg.sender,address(this),_tokenIdsVouchers[i]);
         }
-        requestToInfo[requestId] = request(length,false);
+        requestToInfo[requestId] = request(msg.sender,length,false);
         requestToEggs[requestId] = _tokenIdsEggs;
     }
 
