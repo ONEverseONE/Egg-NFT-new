@@ -197,7 +197,6 @@ contract Eggs is ERC721Enumerable,Ownable,VRFConsumerBaseV2{
     uint256 requestId, /* requestId */
     uint256[] memory randomWords
     ) internal override {
-    // s_randomWords = randomWords;
     request storage redeemable = requestToInfo[requestId];
     if(redeemable.egg){
         for(uint k=0;k<redeemable.amount;k++){
