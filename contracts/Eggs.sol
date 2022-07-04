@@ -151,7 +151,6 @@ contract Eggs is ERC721Enumerable,Ownable,VRFConsumerBaseV2{
     }
 
     function mint(uint256[] calldata _whitelistID,bool USDC_Payment) external notPaused{
-        // require(msg.sender == tx.origin,"Contract not allowed");
         require(wlPhase,"Neither phase 1 or 2");
         uint length = _whitelistID.length;
 
@@ -190,16 +189,11 @@ contract Eggs is ERC721Enumerable,Ownable,VRFConsumerBaseV2{
                 );
             
             requestToInfo[requestId] = request(msg.sender,redeemable,true);
-            // for(uint k=0;k<redeemable;k++){
-            //     tokenID++;
-            //     _safeMint(msg.sender, tokenID);
-            //     // EggsMetadata[tokenID] = generateEgg(random, k);
-            // }
             
         }
     }
 
-        function fulfillRandomWords(
+    function fulfillRandomWords(
     uint256 requestId, /* requestId */
     uint256[] memory randomWords
     ) internal override {
