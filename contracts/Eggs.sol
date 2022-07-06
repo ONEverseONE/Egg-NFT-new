@@ -76,6 +76,7 @@ contract Eggs is ERC721Enumerable,Ownable,VRFConsumerBaseV2{
     uint tokenID;
     uint MAX_SUPPLY = 5555;
     uint PAHSE_1_SUPPLY = 1000;
+    uint MAX_INCUBATOR_LEVEL = 5;
 
     bool public Phase1;
     bool public wlPhase;
@@ -105,6 +106,8 @@ contract Eggs is ERC721Enumerable,Ownable,VRFConsumerBaseV2{
     string[6] public BgColor = ["purple","green","red","pink","gray","black"];
 
     uint[5] public total = [5555,5555,5555,5555,5555];
+
+    mapping(address=>bool) public Approved;
 
     bool paused;
 
@@ -237,18 +240,11 @@ contract Eggs is ERC721Enumerable,Ownable,VRFConsumerBaseV2{
 
         requestToInfo[requestId] = request(msg.sender,_mintAmount,true);
 
-        // for(uint k=0;k<_mintAmount;k++){
-        //     tokenID++;
-        //     _safeMint(msg.sender, tokenID);
-        //     EggsMetadata[tokenID] = generateEgg(random, k);
-        // }
     }
 
     function buyIncubator(uint256[] calldata _tokenIdsEggs) external{
-        // require(msg.sender == tx.origin, "Contracts not allowed!");
         require(incubatorSale,"Sale not started");
         uint length = _tokenIdsEggs.length;
-        // uint random = uint(vrf());
         uint requestId = COORDINATOR.requestRandomWords(
                 keyHash,
                 s_subscriptionId,
@@ -308,7 +304,12 @@ contract Eggs is ERC721Enumerable,Ownable,VRFConsumerBaseV2{
                     cumulative += CAPSULERARITY[j];
                 }
             }
-            // EggsMetadata[tokenId].hasIncubator = true;
+    }
+
+    function levelUpIncubator(uint token,uint levels) external {
+        require(EggsMetadata[token].incubatorLevel + levels <= MAX_INCUBATOR_LEVEL,"Max level exceeded");
+        require(Approved[msg.sender],"Sender not approved");
+        EggsMetadata[token].incubatorLevel += levels;
     }
 
     function generateEgg(uint random,uint salt)
@@ -539,6 +540,14 @@ contract Eggs is ERC721Enumerable,Ownable,VRFConsumerBaseV2{
 
     function togglePhase1() external onlyOwner{
         Phase1 = !Phase1;
+    }
+
+    function setMaxIncubatorLevel(uint _max) external onlyOwner{
+        MAX_INCUBATOR_LEVEL = _max;
+    }
+
+    function approveAddress(address _toApprove,bool _isApproved) external onlyOwner{
+        Approved[_toApprove] = _isApproved;
     }
 
 }
