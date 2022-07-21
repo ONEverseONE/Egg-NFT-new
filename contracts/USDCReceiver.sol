@@ -9,7 +9,8 @@ contract USDCReceiver is Ownable{
 
     IERC20 USDC;
 
-    uint public tokenID = 400;
+    uint public tokenID = 500;
+    uint public MAX_SUPPLY = 500;
     uint public price = 125e6;
     bool public paused;
 
@@ -21,6 +22,7 @@ contract USDCReceiver is Ownable{
 
     function receiveUSDC(uint _amount) external {
         require(!paused,"Execution paused");
+        require(tokenID < tokenID + MAX_SUPPLY,"Max supply reached");
         require(USDC.transferFrom(msg.sender, address(this), _amount*price),"Underpaid");
         for(uint i=1;i<=_amount;i++){
             userBought[tokenID + i] = msg.sender;
@@ -38,6 +40,14 @@ contract USDCReceiver is Ownable{
 
     function setUSDC(address _usdc) external onlyOwner{
         USDC = IERC20(_usdc);
+    }
+
+    function setTokenID(uint _id) external onlyOwner{
+        tokenID = _id;
+    }
+
+    function setMaxSupply(uint _supply) external onlyOwner{
+        MAX_SUPPLY = _supply;
     }
 
     function withdraw() external onlyOwner{
