@@ -22,7 +22,7 @@ contract USDCReceiver is Ownable{
 
     function receiveUSDC(uint _amount) external {
         require(!paused,"Execution paused");
-        require(tokenID < tokenID + MAX_SUPPLY,"Max supply reached");
+        require(tokenID + _amount <= 500 + MAX_SUPPLY,"Max supply reached");
         require(USDC.transferFrom(msg.sender, address(this), _amount*price),"Underpaid");
         for(uint i=1;i<=_amount;i++){
             userBought[tokenID + i] = msg.sender;
